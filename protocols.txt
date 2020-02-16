@@ -1,0 +1,50 @@
+SPI-Protocol
+============
+
+SPI is a synchronous serial protocol, therefore on every cycle a bit is transmitted. If the Master sends an octet, the Slave will also send an octet.
+
+In this project commands and responses have 3 octets each:
+
+Master -> Slave: CMD PAR $FF
+Slave -> Master: XXX STA RES
+
+XXX: Undefined
+$FF: All bits set
+CMD: Command octet
+	$01: reset
+	$02: write octet into buffer towards terminal
+		PAR: octet to be written to terminal
+		RES: number of free octets in write buffer or $ff for error
+	$03: read from Terminal RES is the received octet
+	$04: set tone
+		PAR=$01: silent (level 0, this is not the idle between octets)
+		PAR=$02: 440 Hz (used during connection)
+		PAR=$03: 1700 Hz (used during connection)
+		PAR=$04: switch to data mode
+
+
+DBT-03 Protocol
+================
+1. Terminal legt S auf 5V
+2. Modem legt 440 Hz auf ED (ca 1s)
+3. Modem legt ED auf 5V (ca 2s)
+4. Modem legt ED auf 440 Hz (ca 0.5s)
+5. Modem legt ED auf 5V (ca 0.5s)
+6. Modem legt ED auf 1700 Hz (ca 0.5s)
+7. Modem legt ED auf Daten 1=>0V 0=>5V
+8. Terminal legt Daten auf SD: 1=>5V 0=>0V
+
+Somit ist der Idlezustand der Datenphase ED auf 0V (=>1). Die Daten müssen mit 1200bps 8N1 übertragen werden.
+SD enthält die Sendedaten. Hier ist der 1=>5V 0=>0V. Somit ist die Leitung im Idlezustand bei 5V.
+
+Das Interface scheint auf Optokoppler im Modem ausgelegt zu sein. Somit sollte ED im Terminal mit einem Pull-Up ausgestattet sein, und S und SD sollten in der Lage sein ein paar Milliampere für die Sendedioden liefern können. In echten Modems wird so die Potentialfreiheit sichergestellt. Anderweitig könnten sonst gefährliche Spannungen anliegen oder zumindest Brummschleifen entstehen.
+
+
+IP Protocol
+============
+This protocol is spoken on the IP end of things. Essentially when the Terminal starts a connection by putting S to 5V, a TCP/IP connection will be made to a server. Octets will be exchanged transparently.
+
+Optional parts:
+When a 0 octet is received via IP, the output buffer will be discarded. This allows to react quickly to user input while a page is being transmitted. This could, for example be sent before a new page is transmitted after user input.
+Data units that are not supported by BTX terminals could be filtered out.
+Maybe we could have a special data unit sent from the server to disconnect from that server and re-connect to a new server.
