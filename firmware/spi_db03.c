@@ -3,6 +3,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <avr/sleep.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -10,7 +11,6 @@
 //LEDs
 
 #define LED_STAT_CNT (6)
-#define LED_PHASE_FACTOR (32)
 //LED Modes
 #define LED_ON (0x3f)
 #define LED_OFF (0x00)
@@ -28,17 +28,14 @@ uint8_t led_phase=0;
 
 inline void set_led_ports(uint8_t bits)
 {
-	PORTD=(PORTD & 0x1f) | (bits<<5);
+	PORTD=(PORTD & 0x1f) | ((bits&0x7)<<5);
 }
 
-ISR(TIMER0_OVF_vect) //Should be called with 32*6 Hz=192 Hz or so
+ISR(TIMER0_OVF_vect) //Will be called with 7812 Hz
 {
 	led_phase=led_phase+1;
-	if (led_phase>=LED_STAT_CNT*LED_PHASE_FACTOR) led_phase=0;
-	uint8_t phase=led_phase/LED_PHASE_FACTOR;
-	uint8_t spha=led_phase%LED_PHASE_FACTOR;
-	if (spha!=0) return;
-	set_led_ports(led_stat[phase]);
+	if (led_phase>=LED_STAT_CNT) led_phase=0;
+	set_led_ports(led_stat[led_phase]);
 }
 
 
@@ -48,7 +45,7 @@ inline void set_led_status_phase(uint8_t phase, uint8_t led, int8_t status)
 		led_stat[phase]=led_stat[phase] & (~(1<<led));
 	}
 	if (status==1) { //LED on
-		led_stat[phase]=led_stat[phase] & (~(1<<led));
+		led_stat[phase]=led_stat[phase] | ((1<<led));
 	}
 }
 
@@ -58,7 +55,7 @@ inline void set_led_status(uint8_t led, int8_t status)
 	int n;
 	for (n=0; n<LED_STAT_CNT; n++) {
 		set_led_status_phase(n, led, status & 0x01);
-		status=status<<1;
+		status=status>>1;
 	}
 }
 
@@ -66,10 +63,13 @@ void init_led()
 {
 	//set LED variables
 	int8_t n;
-	for (n=0; n<LED_STAT_CNT; n++) led_stat[n]=0;
+	for (n=0; n<LED_STAT_CNT; n++) led_stat[n]=1<<(n/2);
 	//Init ports
 	DDRD=DDRD | (0xe0);
-	//init timer
+	//init timer to 8MHz/1024=7812Hz
+	TCCR0= (1<<CS02)|(1<<CS00);       // Start Timer 0 with prescaler 1024
+	TIMSK= (1<<TOIE0);                // Enable Timer 0 overflow interrupt
+	sei();      
 	//Prescaler /256 
 }
 
@@ -289,11 +289,20 @@ ISR(TIMER1_OVF_vect)
 	}
 }
 
+inline void set_timer1_rate(int rate)
+{
+	OCR1A=8000000/rate;
+	TCCR1A = (1<<COM1A0);
+	TCCR1B = 0;
+	TIMSK = (1<<TOIE1);
+}
+
 void init_term()
 {
 	DDRD=DDRD & (~0x03); //Set ports D0-D1 to Input
 	DDRB=DDRB | 0x01; //Set port B0 as output
 	//Init Timer1
+	
 }
 
 
@@ -305,10 +314,14 @@ int main (void)
 	init_led();
 	init_term();
 	DDRB |= (1 << PB0);
+	set_sleep_mode(SLEEP_MODE_IDLE);
+	sleep_enable();
+	sei();
 
-	while(1) {
 		set_led_status(0,2);
-		_delay_ms(500);
+	while(1) {
+		sleep_cpu();
+
 	}
 
 	return 0;

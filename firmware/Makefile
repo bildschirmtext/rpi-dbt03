@@ -2,9 +2,9 @@ TARGET=spi_db03
 MCU=atmega8
 SOURCES=spi_db03.c
 
-PROGRAMMER=arduino
+PROGRAMMER=linuxspi
 #auskommentieren für automatische Wahl
-PORT=-P/dev/ttyS0
+PORT=-P/dev/spidev0.0
 BAUD=-B115200
 
 #Ab hier nichts verändern
@@ -34,7 +34,7 @@ size:
 	avr-size --mcu=$(MCU) -C $(TARGET).elf
 
 program:
-	avrdude -p$(MCU) $(PORT) $(BAUD) -c$(PROGRAMMER) -Uflash:w:$(TARGET).hex:a
+	avrdude -p$(MCU) $(PORT) $(BAUD) -c$(PROGRAMMER) -Uflash:w:$(TARGET).hex:a -U lfuse:w:0xee:m -U hfuse:w:0xd1:m 
 
 clean_tmp:
 	rm -rf *.o
