@@ -9,7 +9,7 @@ BAUD=-B115200
 
 #Ab hier nichts verändern
 OBJECTS=$(SOURCES:.c=.o)
-CFLAGS=-c -O3 -Wall
+CFLAGS=-c -O2 -Wall
 LDFLAGS=
 
 all: hex eeprom

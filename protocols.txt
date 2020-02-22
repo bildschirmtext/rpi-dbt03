@@ -21,6 +21,9 @@ CMD: Command octet
 		PAR=$02: 440 Hz (used during connection)
 		PAR=$03: 1700 Hz (used during connection)
 		PAR=$04: switch to data mode
+	$05: set LED
+		Bits 0-1: Number of the LED
+		Bits 2-7: State of the LED in each one of the 6 phases
 
 
 DBT-03 Protocol

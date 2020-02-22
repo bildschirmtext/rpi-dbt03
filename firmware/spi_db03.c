@@ -20,11 +20,15 @@
 #define LED_PHASE_2 (LED_PHASE_1<<2)
 #define LED_PHASE_3 (LED_PHASE_1<<4)
 
-
+#define DIV_1200HZ (6666)
+#define DIV_880HZ (9090)
+#define DIV_3400HZ (2352)
 
 uint8_t led_stat[LED_STAT_CNT];
 uint8_t led_phase=0;
 
+
+inline void set_term_mode(int mode);
 
 inline void set_led_ports(uint8_t bits)
 {
@@ -33,6 +37,7 @@ inline void set_led_ports(uint8_t bits)
 
 ISR(TIMER0_OVF_vect) //Will be called with 7812 Hz
 {
+	sei(); //Enable Interrupts again so this interrupt can be preempted
 	led_phase=led_phase+1;
 	if (led_phase>=LED_STAT_CNT) led_phase=0;
 	set_led_ports(led_stat[led_phase]);
@@ -41,11 +46,12 @@ ISR(TIMER0_OVF_vect) //Will be called with 7812 Hz
 
 inline void set_led_status_phase(uint8_t phase, uint8_t led, int8_t status)
 {
+	if (phase>=LED_STAT_CNT) return;
+	uint8_t map=(1<<led);
 	if (status==0) { //LED off
-		led_stat[phase]=led_stat[phase] & (~(1<<led));
-	}
-	if (status==1) { //LED on
-		led_stat[phase]=led_stat[phase] | ((1<<led));
+		led_stat[phase]=led_stat[phase] & (~map);
+	} else { //LED on
+		led_stat[phase]=led_stat[phase] | (map);
 	}
 }
 
@@ -63,12 +69,12 @@ void init_led()
 {
 	//set LED variables
 	int8_t n;
-	for (n=0; n<LED_STAT_CNT; n++) led_stat[n]=1<<(n/2);
+	for (n=0; n<LED_STAT_CNT; n++) led_stat[n]=0;
 	//Init ports
 	DDRD=DDRD | (0xe0);
 	//init timer to 8MHz/1024=7812Hz
 	TCCR0= (1<<CS02)|(1<<CS00);       // Start Timer 0 with prescaler 1024
-	TIMSK= (1<<TOIE0);                // Enable Timer 0 overflow interrupt
+	TIMSK= TIMSK|(1<<TOIE0);                // Enable Timer 0 overflow interrupt
 	sei();      
 	//Prescaler /256 
 }
@@ -120,6 +126,15 @@ inline int8_t write_to_buffer(buffer_t *b, uint8_t v)
 buffer_t rpi_to_term;
 buffer_t term_to_rpi;
 
+uint8_t get_status()
+{
+	uint8_t bits=0;
+	if (buffer_used(&term_to_rpi)>0) bits=bits | (1<<7);
+	if (buffer_used(&rpi_to_term)<BSIZE/2) bits=bits | (1<<6);
+	if (buffer_used(&rpi_to_term)<BSIZE-8) bits=bits | (1<<5);
+	return bits;
+}
+
 /*spi_protocol
  * MOSI cmd par $ff
  * SOMI und sta res
@@ -127,6 +142,9 @@ buffer_t term_to_rpi;
  * par: parameter octet
  * und: undefined
  * sta: status octet
+ * 	Bit 7: Octet from terminal
+ * 	Bit 6: Free space in buffer to terminal
+ * 	Bit 5: More than 8 octets free in buffer
  * res: result / read data
  * cmd=$01 reset, par undefined
  * cmd=$02 write, parameter octet to Write
@@ -138,6 +156,10 @@ buffer_t term_to_rpi;
  * 	par=$02: 440 Hz
  * 	par=$03: 1700 Hz
  * 	par=$04: set to data
+ * cmd=0x05 set LEDs
+ * 	par:
+ * 	  Bit 0-1: LED Number
+ * 	  Bit 2-7: LED Pattern
  */
 
 /*spi_state -1: idle
@@ -156,13 +178,14 @@ ISR(SPI_STC_vect)
 			spi_state=spi_in;
 		} else spi_state=0x10;
 		//write status octet to SPI
+		spi_out=get_status();
 	} else 
 	if (spi_state==0x01) { //Reset
 		clear_buffer(&rpi_to_term);
 		clear_buffer(&term_to_rpi);
 		spi_state=0x10; //Wait for $ff
 	} else 
-	if (spi_state==0x02) { //write
+	if (spi_state==0x03) { //write
 		int8_t res=write_to_buffer(&rpi_to_term, spi_in);
 		if (res<0) {
 			spi_out=0xff; //write $ff to error
@@ -188,6 +211,10 @@ ISR(SPI_STC_vect)
 		//
 		spi_state=0x10;
 	} else 
+	if (spi_state==0x05) { //set bits
+		set_led_status((spi_in &0x03), spi_in>>2);
+		spi_state=0x10;
+	} else 
 	if ( (spi_state==0x10) && (spi_in==0xff) ){ //0xff when it's expected
 		spi_state=-1;
 	} else { //Error, handle this
@@ -199,6 +226,8 @@ ISR(SPI_STC_vect)
 void init_spi()
 {
 	//init SPI
+	SPCR=(1<<SPIE) | (1<<SPE);
+	DDRB=DDRB| (1<<4);
 }
 
 
@@ -245,7 +274,7 @@ inline void set_ed_line(uint8_t bit)
 	PORTB=(PORTB & 0xfe) | (bit&0x01);
 }
 
-ISR(TIMER1_OVF_vect)
+ISR(TIMER1_COMPA_vect)
 {
 	//Read Port D1 and invert it
 	term_in_uart(((PIND & 0x02)>>1)^0x01);
@@ -289,22 +318,49 @@ ISR(TIMER1_OVF_vect)
 	}
 }
 
-inline void set_timer1_rate(int rate)
+inline void set_timer1_rate(uint16_t divider)
 {
-	OCR1A=8000000/rate;
-	TCCR1A = (1<<COM1A0);
-	TCCR1B = 0;
-	TIMSK = (1<<TOIE1);
+	OCR1A=divider;
+	TCCR1A = 0;
+	TCCR1B = (1<<WGM12) | 1; //No prescaler
+	TIMSK = TIMSK | (1<<OCIE1A);
 }
 
-void init_term()
+inline void init_term()
 {
 	DDRD=DDRD & (~0x03); //Set ports D0-D1 to Input
 	DDRB=DDRB | 0x01; //Set port B0 as output
+	term_state=-1;
 	//Init Timer1
-	
+	set_timer1_rate(DIV_880HZ);
 }
 
+ /* 	mode=$01: silent  (level 0)
+ * 	mode=$02: 440 Hz
+ * 	mode=$03: 1700 Hz
+ * 	mode=$04: set to data
+ */
+inline void set_term_mode(int mode)
+{
+	if (mode==1) { //Silent 0
+		term_state=-3; //Idle low state between tones
+		set_timer1_rate(DIV_880HZ);
+	} else 
+	if (mode==2) { //440 Hz tone
+		term_state=-1; //Tone state
+		set_timer1_rate(DIV_880HZ);
+	} else 
+	if (mode==3) { //1700 Hz tone
+		term_state=-1; //Tone state
+		set_timer1_rate(DIV_3400HZ);
+	} else 
+	if (mode==4) { //Data
+		term_state=0; //Idle low state between tones
+		clear_buffer(&rpi_to_term);
+		clear_buffer(&term_to_rpi);
+		set_timer1_rate(DIV_1200HZ);
+	};
+}
 
 int main (void) 
 {
@@ -318,10 +374,12 @@ int main (void)
 	sleep_enable();
 	sei();
 
-		set_led_status(0,2);
+	set_led_status(0,0);
+	set_led_status(1,0);
+	set_led_status(2,0);
+	
 	while(1) {
 		sleep_cpu();
-
 	}
 
 	return 0;
