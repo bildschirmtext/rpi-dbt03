@@ -986,4 +986,12 @@ Text Notes 7400 7500 0    50   ~ 0
 RPI to DBT-03
 Text Notes 4900 4200 0    50   ~ 0
 R10-R14 ggf größer machen
+Wire Wire Line
+	3550 1600 3950 1600
+Text Label 3650 1600 0    50   ~ 0
+SPI_CS
+Wire Wire Line
+	4900 5000 5300 5000
+Text Label 5000 5000 0    50   ~ 0
+SPI_CS
 $EndSCHEMATC
