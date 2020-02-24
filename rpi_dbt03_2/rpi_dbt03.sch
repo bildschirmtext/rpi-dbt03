@@ -958,14 +958,6 @@ Wire Wire Line
 	4900 4900 5300 4900
 Text Label 3650 1400 0    50   ~ 0
 _E
-Text Label 3700 2800 0    50   ~ 0
-_SD0
-Text Label 3700 2900 0    50   ~ 0
-_S0
-Text Label 6750 1400 0    50   ~ 0
-_SD0
-Text Label 6750 2000 0    50   ~ 0
-_S0
 Text Label 6550 3300 0    50   ~ 0
 _E
 Wire Wire Line
@@ -994,4 +986,12 @@ Wire Wire Line
 	4900 5000 5300 5000
 Text Label 5000 5000 0    50   ~ 0
 SPI_CS
+Text Label 6750 1400 0    50   ~ 0
+_S0
+Text Label 6750 2000 0    50   ~ 0
+_SD0
+Text Label 3700 2800 0    50   ~ 0
+_S0
+Text Label 3700 2900 0    50   ~ 0
+_SD0
 $EndSCHEMATC
