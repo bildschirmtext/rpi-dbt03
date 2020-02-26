@@ -5,17 +5,19 @@ SPI is a synchronous serial protocol, therefore on every cycle a bit is transmit
 
 In this project commands and responses have 3 octets each:
 
-Master -> Slave: CMD PAR $FF
-Slave -> Master: XXX STA RES
+Master -> Slave: $ff CMD PAR $FF $FF
+Slave -> Master: XXX $AA STA STB RES
 
 XXX: Undefined
 $FF: All bits set
+$AA: Hex AA can be used to detect ATMega
 CMD: Command octet
-	$01: reset
 	$02: write octet into buffer towards terminal
 		PAR: octet to be written to terminal
 		RES: number of free octets in write buffer or $ff for error
-	$03: read from Terminal RES is the received octet
+	$03: read from Terminal 
+		RES: received octet or $ff in case of error
+		STB: number of bits in buffer or $ff if nothing there
 	$04: set tone
 		PAR=$01: silent (level 0, this is not the idle between octets)
 		PAR=$02: 440 Hz (used during connection)
@@ -24,7 +26,13 @@ CMD: Command octet
 	$05: set LED
 		Bits 0-1: Number of the LED
 		Bits 2-7: State of the LED in each one of the 6 phases
-
+STA: Status A
+	Bit 7: Octet to be read from terminal
+  	Bit 6: Free space in buffer to terminal
+  	Bit 5: More than 8 octets free in buffer
+  	Bit 4: S input 1=> Terminal wants to dial
+	Bit 0: always on
+STB: Status B: depends on command
 
 DBT-03 Protocol
 ================
