@@ -8,6 +8,19 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
+#include <wiringPi.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <arpa/inet.h> 
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
@@ -21,7 +34,7 @@ static const char *device = "/dev/spidev0.0";
 
 #define SPILEN (5)
 
-uint16_t transfer(int fd, const uint8_t cmd, const uint16_t par, uint8_t *result)
+uint16_t spi_transfer(int fd, const uint8_t cmd, const uint16_t par, uint8_t *result)
 {
 	uint8_t tx[SPILEN] = {0xff, 0x00, 0x00, 0x00, 0x00};
 
@@ -42,7 +55,7 @@ uint16_t transfer(int fd, const uint8_t cmd, const uint16_t par, uint8_t *result
 	int res = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
 	if (res < 1) return -1;
 
-	/*int n;
+/*	int n;
 	printf(">");
 	for (n=0; n<SPILEN; n++) {
 		printf("%02x ", tx[n]);
@@ -56,37 +69,38 @@ uint16_t transfer(int fd, const uint8_t cmd, const uint16_t par, uint8_t *result
 	return rx[2] | (rx[3]<<8);
 }
 
-int set_led(int fd, const int led, const int state)
+
+int set_mcu_led(int fd, const int led, const int state)
 {
 	if (led<0) return -1;
 	if (led>2) return -1;
-	return transfer(fd, 0x05, ((state&0x3f)<<2)|led, NULL); 
+	return spi_transfer(fd, 0x05, ((state&0x3f)<<2)|led, NULL); 
 }
 
 int set_tone(int fd, const int tone)
 {
 	if (tone<1) return -1;
 	if (tone>4) return -1;
-	return transfer(fd, 0x04, tone, NULL);
+	return spi_transfer(fd, 0x04, tone, NULL);
 }
 
 int send_octet(int fd, const int octet, uint8_t *res)
 {
 	if (octet<0) return -1;
 	if (octet>255) return -1;
-	return transfer(fd, 0x02, octet, res);
+	return spi_transfer(fd, 0x02, octet, res);
 }
 
 int get_free_octets(int fd)
 {
 	uint8_t res=0;
-	transfer(fd, 0x06, 0x00, &res);
+	spi_transfer(fd, 0x06, 0x00, &res);
 	return res&0x7f;
 }
 
 int read_octet(int fd, uint8_t *res)
 {
-	return transfer(fd,0x03, 0, res);
+	return spi_transfer(fd,0x03, 0, res);
 }
 
 int open_spi()
@@ -116,6 +130,193 @@ int open_spi()
 	return fd;
 }
 
+void set_leds(int led)
+{
+	digitalWrite(22, (led>>0)&0x01);
+	digitalWrite(23, (led>>1)&0x01);
+}
+
+
+/* Initialize the terminal and wait for it to start*/
+int term_start(int fd)
+{
+	int n=0;
+	int s=0;
+	set_leds(0x01);
+	set_tone(fd, 1); //Silence
+	printf("Waiting for S to go low\n");
+	//If S is high (terminal picked up) wait for it to go now)
+	while (s!=0) {
+		int status=set_mcu_led(fd, 1, n); //Make LED 1 on the MCU blink
+		if (n==0) n=0x3f; else n=0;
+		usleep(250000);
+		s=(status>>4)&0x01;
+	}
+	set_mcu_led(fd, 1, 0); //Turn of LED 1 on the MCU
+	usleep(250000);
+
+	printf("Waiting for S to go high\n");
+	while (s==0) {
+		int status=set_mcu_led(fd, 0, n); //Make LED 0 on the MCU blink
+		if (n==0) n=0x3f; else n=0;
+		usleep(250000);
+		s=(status>>4)&0x01;
+	}
+	set_mcu_led(fd, 0, 0); //Turn of LED 0 on the MCU
+	set_tone(fd, 2); //440Hz 
+	return 0;
+}
+
+/* Acknowledge the connection */
+int term_constart(int fd)
+{
+	int status=set_mcu_led(fd, 0, 0x15);
+	if ((status>>4)&0x01==0) return -1;
+	status=set_tone(fd, 2); //440 Hz
+	if ((status>>4)&0x01==0) return -1;
+	usleep(1000000);
+	status=set_tone(fd, 1);
+	if ((status>>4)&0x01==0) return -1;
+	usleep(2000000);
+	status=set_tone(fd, 2);
+	if ((status>>4)&0x01==0) return -1;
+	usleep( 500000);
+	status=set_tone(fd, 3);
+	if ((status>>4)&0x01==0) return -1;
+	usleep(1000000);
+	status=set_tone(fd, 4);
+	if ((status>>4)&0x01==0) return -1;
+	status=set_mcu_led(fd, 0, 0);
+	if ((status>>4)&0x01==0) return -1;
+	usleep(1000000);
+	return 0;
+}
+
+int do_connect(const char *target)
+{
+	char addr[256];
+	memset(addr, 0, sizeof(addr));
+	char *colon=strchr(target, ':');
+	if (colon==NULL) {
+		printf("Error invalid address/port\n");
+		return -1;
+	}
+	int alen=colon-target;
+	if (alen<=0) {
+		printf("Error address to short\n");
+		return -1;
+	}
+	if (alen>=255) {
+		printf("Error address to long\n");
+		return -1;
+	}
+	strncpy(addr, target, alen);
+	int port=atoi(colon+1);
+	printf("Addr: %s Port: %d\n", addr, port);
+
+	int sockfd = 0, n = 0;
+	struct sockaddr_in serv_addr; 
+
+	if((sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0)
+	{
+		printf("\n Error : Could not create socket \n");
+		return -1;
+	} 
+
+	memset(&serv_addr, 0, sizeof(serv_addr)); 
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(port); 
+
+	if(inet_pton(AF_INET, addr, &serv_addr.sin_addr)<=0)
+	{
+		printf("inet_pton error occured\n");
+		return -1;
+	} 
+
+	if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+	{
+		if (errno==EINPROGRESS) return sockfd;
+		printf("Error : Connect Failed  %d (%s)\n", errno, strerror(errno));
+		return -1;
+	} 
+	return sockfd;
+}
+
+
+void reset_mcu()
+{
+	pinMode(6, OUTPUT);
+	printf("Reset MCU...");
+	digitalWrite(6, 0);
+	usleep(200000);
+	digitalWrite(6, 1);
+	usleep(500000);
+	printf("done\n");
+}
+
+int handle_socket_to_term(int fd, int sock_fd)
+{
+	int status=0;
+	char buf[8];
+	int l=read(sock_fd, buf, sizeof(buf));
+	if (l<0) { //Some socket error, probably connection broke
+		if (errno==EAGAIN) return 0;
+		printf("Error : read Failed  %d (%s)\n", errno, strerror(errno));
+		return -1;
+	}
+	if (l>0) {
+		uint8_t res=0;
+		int n;
+		for (n=0; n<l; n++) {
+			status=send_octet(fd, buf[n], &res);
+			if ( (status>>4)&0x01==0) {
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+
+int handle_term_to_socket(int fd, int sock_fd)
+{
+	uint8_t oct=0;
+	int status=read_octet(fd, &oct);
+	if ( (status>>4)&0x01==0) {
+		return -1;
+	}
+	if (oct!=0xff) {
+		char buf[1];
+		buf[0]=oct;
+		write(sock_fd, buf, 1);
+	}
+	return 0;
+}
+
+int socket_term_loop(int fd, int sock_fd)
+{
+	int status=0;
+	while (0==0) {
+		int bf=get_free_octets(fd);
+		if (bf<=31) {
+			status=set_mcu_led(fd, 1, 0x3f);
+			if (((status>>4)&0x01)==0) return -1;
+		} else {
+			status=set_mcu_led(fd, 1, 0);
+			if (((status>>4)&0x01)==0) return -1;
+		}
+		if (bf>8) {
+			status=handle_socket_to_term(fd, sock_fd);
+			if (status<0) return status;
+		}
+		status=handle_term_to_socket(fd, sock_fd);
+		if (status<0) return status;
+		usleep(10000);
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 	int ret = 0;
@@ -124,74 +325,34 @@ int main(int argc, char *argv[])
 		printf("couldn't open device\n");
 		return 1;
 	}
-
-	while (0==0) {
-		int n=0;
-		int s=0;
-		set_tone(fd, 1); //Silence;
-		printf("Waiting for S to goLo\n");
-		while (s!=0) {
-			int status=set_led(fd, 1, n);
-			if (n==0) n=0x3f; else n=0;
-			usleep(250000);
-			s=(status>>4)&0x01;
-		}
-		set_led(fd, 1, 0);
-		set_tone(fd, 2); //440Hz 
-		printf("Waiting for S to go high\n");
-		while (s==0) {
-			int status=set_led(fd, 0, n);
-			if (n==0) n=0x3f; else n=0;
-			usleep(250000);
-			s=(status>>4)&0x01;
-		}
-		set_led(fd, 0, 0x3f);
-		set_tone(fd, 2);
-		usleep(1000000);
-		set_tone(fd, 1);
-		usleep(2000000);
-		set_tone(fd, 2);
-		usleep( 500000);
-		set_tone(fd, 3);
-		usleep(1000000);
-		set_tone(fd, 4);
-		set_led(fd, 0, 0);
-		set_led(fd, 1, 0x15);
-
-		usleep(2000000);
-		s=1;
-		n=32;
-		int bf=get_free_octets(fd);
-		while (s!=0) {
-			int status=0;
-			uint8_t res=0;
-			status=read_octet(fd, &res);
-			printf("read_octet res=%02x status=%04x\n", res, status);
-			usleep(1000000);
-			if (bf>8) {
-				status=send_octet(fd, n, &res);
-				printf("%c %02x %02x %02x\n", n, n, status, res);
-				n=n+1;
-				if (n>=32+41) n=32;
-				if (res==0xff) {
-					printf("Transmission error\n");
-					break; //Error, hang up
-				} else {
-					printf("%d octets free in buffer\n", res);
-					bf=res;
-				}
-			} else {
-				bf=get_free_octets(fd);
-				printf("waiting: %d octets free in buffer\n", bf);
-			}
-			status=set_led(fd, 0, n);
-			s=(status>>4)&0x01;
-			usleep(100);
-		}
-
+	if (wiringPiSetup()==-1) {
+		printf("Coulsn't open WiringPi\n");
+		return 1;
 	}
+	if (argc!=2) {
+		printf("Usage: %s <ip>:<port>\n", argv[0]);
+		return 1;
+	}
+
+	pinMode(22, OUTPUT);
+	pinMode(23, OUTPUT);
+
+
+	term_start(fd);
+
+	int sock_fd=do_connect(argv[1]);
+	if (fd<0) {
+		reset_mcu();
+		return 1;
+	}
+
+	term_constart(fd);
+
+	
+	int status=socket_term_loop(fd, sock_fd);
+	reset_mcu();
 
 	close(fd);
 
-	return ret;
+	return 0;
 }

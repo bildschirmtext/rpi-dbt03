@@ -1,0 +1,13 @@
+[Unit]
+Description=Software fuer das DBT-03 Modul
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+ExecStart=/usr/local/sbin/rpi_dbt03 195.201.94.166:20000 
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
