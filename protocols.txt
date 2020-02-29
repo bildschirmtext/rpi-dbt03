@@ -26,6 +26,7 @@ CMD: Command octet
 	$05: set LED
 		Bits 0-1: Number of the LED
 		Bits 2-7: State of the LED in each one of the 6 phases
+	$06: get free octets of buffer to terminal
 STA: Status A
 	Bit 7: Octet to be read from terminal
   	Bit 6: Free space in buffer to terminal

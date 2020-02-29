@@ -378,7 +378,7 @@ inline void init_term()
 {
 	DDRD=DDRD & (~0x03); //Set ports D0-D1 to Input
 	DDRB=DDRB | 0x01; //Set port B0 as output
-	term_state=-1;
+	term_state=-3;
 	//Init Timer1
 	set_timer1_rate(DIV_880HZ);
 }
