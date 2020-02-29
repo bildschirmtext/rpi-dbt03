@@ -19,18 +19,21 @@ static void pabort(const char *s)
 
 static const char *device = "/dev/spidev0.0";
 
-int transfer(int fd, const uint8_t cmd, const uint8_t par, uint8_t *result)
+#define SPILEN (5)
+
+uint16_t transfer(int fd, const uint8_t cmd, const uint16_t par, uint8_t *result)
 {
-	uint8_t tx[3] = {0xff, 0xFF, 0xff};
+	uint8_t tx[SPILEN] = {0xff, 0x00, 0x00, 0x00, 0x00};
 
-	tx[0]=cmd;
-	tx[1]=par;
+	tx[1]=cmd;
+	tx[2]=(par & 0xff);
+	tx[3]=(par >>8 )&0xff;
 
-	uint8_t rx[3] = {0x00, 0x00, 0x00};
+	uint8_t rx[SPILEN] = {0x00, 0x00, 0x00, 0x00, 0x00};
 	struct spi_ioc_transfer tr = {
 		.tx_buf = (unsigned long)tx,
 		.rx_buf = (unsigned long)rx,
-		.len = 3,
+		.len = SPILEN,
 		.delay_usecs = 0,
 		.speed_hz = 0,
 		.bits_per_word = 8,
@@ -39,17 +42,18 @@ int transfer(int fd, const uint8_t cmd, const uint8_t par, uint8_t *result)
 	int res = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
 	if (res < 1) return -1;
 
-	int n;
-	for (n=0; n<3; n++) {
+	/*int n;
+	printf(">");
+	for (n=0; n<SPILEN; n++) {
 		printf("%02x ", tx[n]);
 	}
-	printf("\n");
-	for (n=0; n<3; n++) {
+	printf("\n<");
+	for (n=0; n<SPILEN; n++) {
 		printf("%02x ", rx[n]);
 	}
-	printf("\n");
-	if (result!=NULL) *result=rx[2];
-	return rx[1];
+	printf("\n");*/
+	if (result!=NULL) *result=rx[4];
+	return rx[2] | (rx[3]<<8);
 }
 
 int set_led(int fd, const int led, const int state)
@@ -57,6 +61,32 @@ int set_led(int fd, const int led, const int state)
 	if (led<0) return -1;
 	if (led>2) return -1;
 	return transfer(fd, 0x05, ((state&0x3f)<<2)|led, NULL); 
+}
+
+int set_tone(int fd, const int tone)
+{
+	if (tone<1) return -1;
+	if (tone>4) return -1;
+	return transfer(fd, 0x04, tone, NULL);
+}
+
+int send_octet(int fd, const int octet, uint8_t *res)
+{
+	if (octet<0) return -1;
+	if (octet>255) return -1;
+	return transfer(fd, 0x02, octet, res);
+}
+
+int get_free_octets(int fd)
+{
+	uint8_t res=0;
+	transfer(fd, 0x06, 0x00, &res);
+	return res&0x7f;
+}
+
+int read_octet(int fd, uint8_t *res)
+{
+	return transfer(fd,0x03, 0, res);
 }
 
 int open_spi()
@@ -78,7 +108,7 @@ int open_spi()
 	ret = ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &bits);
 	if (ret == -1) return ret;
 
-	int speed=10000;
+	int speed=50000;
 	ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
 	if (ret == -1) return ret;
 	ret = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
@@ -96,16 +126,67 @@ int main(int argc, char *argv[])
 	}
 
 	while (0==0) {
-		int n;
-		for (n=0; n<3; n++)
-		{
-			set_led(fd, n, 0x3f);
-			usleep(1000000);
+		int n=0;
+		int s=0;
+		set_tone(fd, 1); //Silence;
+		printf("Waiting for S to goLo\n");
+		while (s!=0) {
+			int status=set_led(fd, 1, n);
+			if (n==0) n=0x3f; else n=0;
+			usleep(250000);
+			s=(status>>4)&0x01;
 		}
-		for (n=0; n<3; n++)
-		{
-			set_led(fd, n, 0x00);
+		set_led(fd, 1, 0);
+		set_tone(fd, 2); //440Hz 
+		printf("Waiting for S to go high\n");
+		while (s==0) {
+			int status=set_led(fd, 0, n);
+			if (n==0) n=0x3f; else n=0;
+			usleep(250000);
+			s=(status>>4)&0x01;
+		}
+		set_led(fd, 0, 0x3f);
+		set_tone(fd, 2);
+		usleep(1000000);
+		set_tone(fd, 1);
+		usleep(2000000);
+		set_tone(fd, 2);
+		usleep( 500000);
+		set_tone(fd, 3);
+		usleep(1000000);
+		set_tone(fd, 4);
+		set_led(fd, 0, 0);
+		set_led(fd, 1, 0x15);
+
+		usleep(2000000);
+		s=1;
+		n=32;
+		int bf=get_free_octets(fd);
+		while (s!=0) {
+			int status=0;
+			uint8_t res=0;
+			status=read_octet(fd, &res);
+			printf("read_octet res=%02x status=%04x\n", res, status);
 			usleep(1000000);
+			if (bf>8) {
+				status=send_octet(fd, n, &res);
+				printf("%c %02x %02x %02x\n", n, n, status, res);
+				n=n+1;
+				if (n>=32+41) n=32;
+				if (res==0xff) {
+					printf("Transmission error\n");
+					break; //Error, hang up
+				} else {
+					printf("%d octets free in buffer\n", res);
+					bf=res;
+				}
+			} else {
+				bf=get_free_octets(fd);
+				printf("waiting: %d octets free in buffer\n", bf);
+			}
+			status=set_led(fd, 0, n);
+			s=(status>>4)&0x01;
+			usleep(100);
 		}
 
 	}

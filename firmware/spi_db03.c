@@ -126,25 +126,30 @@ inline int8_t write_to_buffer(buffer_t *b, uint8_t v)
 buffer_t rpi_to_term;
 buffer_t term_to_rpi;
 
-uint8_t get_status()
+inline uint8_t get_status()
 {
 	uint8_t bits=0;
 	if (buffer_used(&term_to_rpi)>0) bits=bits | (1<<7);
 	if (buffer_used(&rpi_to_term)<BSIZE/2) bits=bits | (1<<6);
 	if (buffer_used(&rpi_to_term)<BSIZE-8) bits=bits | (1<<5);
+	//PD0 low => bit 4 high
+	if ((PIND&0x01)==0) bits=bits | (1<<4);
 	return bits;
 }
 
 /*spi_protocol
- * MOSI cmd par $ff
- * SOMI und sta res
+ * MOSI $ff cmd par $ff $ff
+ * SOMI und und sta stb res
  *
  * par: parameter octet
  * und: undefined
- * sta: status octet
+ * sta: status octet A
  * 	Bit 7: Octet from terminal
  * 	Bit 6: Free space in buffer to terminal
  * 	Bit 5: More than 8 octets free in buffer
+ * 	Bit 4: S input 1=> Terminal wants to dial
+ * 	Bit 0: always 1
+ * stb: status octet B
  * res: result / read data
  * cmd=$01 reset, par undefined
  * cmd=$02 write, parameter octet to Write
@@ -162,65 +167,92 @@ uint8_t get_status()
  * 	  Bit 2-7: LED Pattern
  */
 
-/*spi_state -1: idle
- * $01-$0F: command byte received
- * $10: wait for $ff
+/*spi_state 
+ * 	0: idle waiting for command
+ *	1-2: receive parameters
+ *	3: wait for $ff
  */
-static int8_t spi_state=-1;
+#define SPILEN (4)
+uint8_t spi_state=0xff;
+
+uint8_t rx[SPILEN]; //Received octets
+uint8_t tx[SPILEN]; //Octets to send
 
 ISR(SPI_STC_vect)
 {
 	//read from SPI to spi_in
 	uint8_t spi_in=SPDR; 
-	uint8_t spi_out=0;
-	if (spi_state==-1) {
-		if (spi_in<0x10) {
-			spi_state=spi_in;
-		} else spi_state=0x10;
-		//write status octet to SPI
-		spi_out=get_status();
-	} else 
-	if (spi_state==0x01) { //Reset
-		clear_buffer(&rpi_to_term);
-		clear_buffer(&term_to_rpi);
-		spi_state=0x10; //Wait for $ff
-	} else 
-	if (spi_state==0x03) { //write
-		int8_t res=write_to_buffer(&rpi_to_term, spi_in);
-		if (res<0) {
-			spi_out=0xff; //write $ff to error
-		} else {
-			//write BSIZE-result to SPI
-			if (res>=BSIZE) spi_out=0xff;
-			else spi_out=BSIZE-res;
+	if ( (spi_state>=SPILEN)) {
+		if (spi_in==0xff) {
+			SPDR=0xAA;
+			spi_state=0;
+			//fill status octets
+			tx[0]=get_status(); //STA
+			tx[1]=0x55; //STB
+			tx[2]=0xAA; //Result
 		}
-		spi_state=0x10;
-	} else
-	if (spi_state==0x03) { //Read
-		int res=get_from_buffer(&term_to_rpi);
-		if (res>=0) { //If there is data in the buffer
-			//write res to 
-			spi_out=res;
-		} else {
-			//write 0 to SPI
-			spi_out=0;
-		}
-		spi_state=0x10; //Wait for $ff
-	} else 
-	if (spi_state==0x04) { //set tone
-		//
-		spi_state=0x10;
-	} else 
-	if (spi_state==0x05) { //set bits
-		set_led_status((spi_in &0x03), spi_in>>2);
-		spi_state=0x10;
-	} else 
-	if ( (spi_state==0x10) && (spi_in==0xff) ){ //0xff when it's expected
-		spi_state=-1;
-	} else { //Error, handle this
+		return;
 	}
-	//write spi_out to spi
-	SPDR=spi_out;
+
+	//Store incoming byte and send outgoing byte (this is the timing critical stuff
+	rx[spi_state]=spi_in;
+	SPDR= tx[spi_state];
+	sei(); //enable interrupts from here
+	//This should be completed within a single SPI clock cycle
+	
+
+	//if first octet is in the command range go to spi_state=1
+	if ((spi_state==0)) {
+		uint8_t cmd=rx[0];
+		if (cmd==0x03) { //read command
+			int res=get_from_buffer(&term_to_rpi);
+			if (res<0) {
+				tx[1]=0xff;
+				tx[2]=0xff;
+			} else {
+				tx[1]=buffer_used(&term_to_rpi);
+				tx[2]=res;
+			}
+		}
+		spi_state=1;
+		return;
+	}
+
+	//Handle parameter octet then go to spi_state=2
+	if (spi_state==1) {
+		uint8_t cmd=rx[0];
+		uint8_t par=rx[1];
+		if (cmd==0x02) { //write command
+			int8_t res=write_to_buffer(&rpi_to_term, spi_in);
+			if (res<0) {
+				tx[2]=0xff;
+			} else {
+				tx[2]=BSIZE-res;
+			}
+		}
+		if (cmd==0x04) { //set tone
+			set_term_mode(par);
+			tx[2]=0xAA;
+		}
+		if (cmd==0x05) { //set LED
+			set_led_status((par & 0x03), par>>2);
+			tx[2]=0xAA;
+		}
+		if (cmd==0x06) { //read number of free octets in output buffer
+			tx[2]=(BSIZE-buffer_used(&rpi_to_term))|0x80; //set bit 7 to avoid 0
+		}
+		spi_state=2;
+		return;
+	}
+
+	if (spi_state==2){
+		spi_state=3;
+		return;
+	}
+	if (spi_state==3){
+		spi_state=0xff;
+		return;
+	}
 }
 
 void init_spi()
@@ -234,29 +266,39 @@ void init_spi()
 //interface towards Terminal
 
 
-uint8_t term_uart_state=0;
+int8_t term_uart_bit=-1;
+int8_t term_uart_phase=0;
 uint8_t term_uart_inb=0;
 
 inline void term_in_uart(int8_t i)
 {
 	//If in the idle state and there is a one bit continue. Otherwise return
-	if (term_uart_state==0) {
+	if (term_uart_bit<0) {
 		if (i!=0) return;
-		term_uart_state=0;
+		term_uart_bit=0;
+		term_uart_phase=0;
 		term_uart_inb=0;
-	}
-	term_uart_state=term_uart_state+1;
-	if (term_uart_state<8*16) { //data bit
-		if ((term_uart_state%16)!=8) return; //If not int the middle of a bit exit
-		term_uart_inb=(term_uart_inb<<1) | i;
 		return;
 	}
-	if (term_uart_state<9*16) { //stop bit
-		if ((term_uart_state%16)!=8) return; //If not int the middle of a bit exit
-		if (i==0) write_to_buffer(&term_to_rpi, term_uart_inb);
-		term_uart_inb=0;
-		term_uart_state=0;
-		return;
+	term_uart_phase=term_uart_phase+1;
+	if (term_uart_phase>=16) {
+		term_uart_bit=term_uart_bit+1;
+		if (term_uart_bit>9) term_uart_bit=-1; //After stop bit, go to idle
+		term_uart_phase=0;
+	}
+	if (term_uart_phase==7) { //Middle of a bit
+		if (term_uart_bit==0) { //Start bit
+			if (i!=0) { //if Start bit is not 0 => framing error
+				term_uart_bit=-1;
+				term_uart_phase=-1;
+			}
+		} else if (term_uart_bit==9) { //Stop bit
+			if (i==1) { //if correct, write to buffer
+				write_to_buffer(&term_to_rpi, term_uart_inb);				
+			}
+		} else { //Data bit
+			term_uart_inb=(term_uart_inb >> 1) | (i<<7); 
+		}
 	}
 }
 
@@ -298,22 +340,28 @@ ISR(TIMER1_COMPA_vect)
 	}
 	if (term_state==0) {
 		int o=get_from_buffer(&rpi_to_term);
-		if (o<0) return;
-		term_outb=0;
+		if (o<0) {
+			set_ed_line(1); //Just to make sure
+			return;
+		}
+		term_outb=o;
 		//send start bit
 		set_ed_line(0);
+		term_state=1;
 		return;
 	}
 	if ( (term_state>0) && (term_state<9) ) {
 		//output data bit
 		set_ed_line(term_outb&0x01);
 		term_outb=term_outb>>1;
+		term_state=term_state+1;
 		return;
 	}
 	if (term_state>=9) {
 		//send stop bit
 		set_ed_line(1);
-		term_state=0;
+		term_state=term_state+1;
+		if (term_state>11) term_state=0;
 		return;
 	}
 }
@@ -330,7 +378,7 @@ inline void init_term()
 {
 	DDRD=DDRD & (~0x03); //Set ports D0-D1 to Input
 	DDRB=DDRB | 0x01; //Set port B0 as output
-	term_state=-1;
+	term_state=-3;
 	//Init Timer1
 	set_timer1_rate(DIV_880HZ);
 }
@@ -355,7 +403,7 @@ inline void set_term_mode(int mode)
 		set_timer1_rate(DIV_3400HZ);
 	} else 
 	if (mode==4) { //Data
-		term_state=0; //Idle low state between tones
+		term_state=0; //Idle high between data octets
 		clear_buffer(&rpi_to_term);
 		clear_buffer(&term_to_rpi);
 		set_timer1_rate(DIV_1200HZ);
