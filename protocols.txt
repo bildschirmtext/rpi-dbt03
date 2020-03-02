@@ -20,8 +20,8 @@ CMD: Command octet
 		STB: number of bits in buffer or $ff if nothing there
 	$04: set tone
 		PAR=$01: silent (level 0, this is not the idle between octets)
-		PAR=$02: 440 Hz (used during connection)
-		PAR=$03: 1700 Hz (used during connection)
+		PAR=$02: 425 Hz (used during connection)
+		PAR=$03: 1300 Hz (used during connection)
 		PAR=$04: switch to data mode
 	$05: set LED
 		Bits 0-1: Number of the LED
@@ -38,11 +38,11 @@ STB: Status B: depends on command
 DBT-03 Protocol
 ================
 1. Terminal legt S auf 5V
-2. Modem legt 440 Hz auf ED (ca 1s)
+2. Modem legt 425 Hz auf ED (ca 1s)
 3. Modem legt ED auf 5V (ca 2s)
-4. Modem legt ED auf 440 Hz (ca 0.5s)
+4. Modem legt ED auf 425 Hz (ca 0.5s)
 5. Modem legt ED auf 5V (ca 0.5s)
-6. Modem legt ED auf 1700 Hz (ca 0.5s)
+6. Modem legt ED auf 1300 Hz (ca 0.5s)
 7. Modem legt ED auf Daten 1=>0V 0=>5V
 8. Terminal legt Daten auf SD: 1=>5V 0=>0V
 
