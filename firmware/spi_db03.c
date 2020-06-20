@@ -21,8 +21,8 @@
 #define LED_PHASE_3 (LED_PHASE_1<<4)
 
 #define DIV_1200HZ (6666)
-#define DIV_880HZ (9090)
-#define DIV_3400HZ (2352)
+#define DIV_850HZ (9412)
+#define DIV_2600HZ (3076)
 
 uint8_t led_stat[LED_STAT_CNT];
 uint8_t led_phase=0;
@@ -380,27 +380,27 @@ inline void init_term()
 	DDRB=DDRB | 0x01; //Set port B0 as output
 	term_state=-3;
 	//Init Timer1
-	set_timer1_rate(DIV_880HZ);
+	set_timer1_rate(DIV_850HZ);
 }
 
  /* 	mode=$01: silent  (level 0)
- * 	mode=$02: 440 Hz
- * 	mode=$03: 1700 Hz
+ * 	mode=$02: 425 Hz
+ * 	mode=$03: 1300 Hz
  * 	mode=$04: set to data
  */
 inline void set_term_mode(int mode)
 {
 	if (mode==1) { //Silent 0
 		term_state=-3; //Idle low state between tones
-		set_timer1_rate(DIV_880HZ);
+		set_timer1_rate(DIV_850HZ);
 	} else 
-	if (mode==2) { //440 Hz tone
+	if (mode==2) { //425 Hz tone
 		term_state=-1; //Tone state
-		set_timer1_rate(DIV_880HZ);
+		set_timer1_rate(DIV_850HZ);
 	} else 
-	if (mode==3) { //1700 Hz tone
+	if (mode==3) { //1300 Hz tone
 		term_state=-1; //Tone state
-		set_timer1_rate(DIV_3400HZ);
+		set_timer1_rate(DIV_2600HZ);
 	} else 
 	if (mode==4) { //Data
 		term_state=0; //Idle high between data octets

@@ -6,3 +6,4 @@ mkdir -p $TARGET
 
 cp rpi_dbt03 $TARGET/ 
 cp rpi_dbt03.service /etc/systemd/system/
+systemctl enable rpi_dbt03
