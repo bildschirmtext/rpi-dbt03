@@ -1,6 +1,5 @@
 EESchema Schematic File Version 4
-LIBS:rpi_dbt03-cache
-EELAYER 26 0
+EELAYER 30 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
@@ -184,29 +183,12 @@ F 3 "~" H 8600 2000 50  0001 C CNN
 	1    8600 2000
 	0    1    1    0   
 $EndComp
-$Comp
-L Device:R R7
-U 1 1 5E0D1AD8
-P 9000 2350
-F 0 "R7" H 9070 2396 50  0000 L CNN
-F 1 "2k2" H 9070 2305 50  0000 L CNN
-F 2 "Resistors_ThroughHole:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" V 8930 2350 50  0001 C CNN
-F 3 "~" H 9000 2350 50  0001 C CNN
-	1    9000 2350
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	9000 2550 9000 2500
-Wire Wire Line
-	8850 1400 9000 1400
 Wire Wire Line
 	8250 2200 8350 2200
 Wire Wire Line
 	8250 2750 8350 2750
 Wire Wire Line
 	8250 1400 8550 1400
-Wire Wire Line
-	8250 2550 9000 2550
 Wire Wire Line
 	8250 1600 8350 1600
 Wire Wire Line
@@ -223,8 +205,6 @@ Wire Wire Line
 Connection ~ 10800 1400
 Wire Wire Line
 	10800 1400 11000 1400
-Wire Wire Line
-	9000 1400 9000 2200
 Wire Wire Line
 	8250 2000 8450 2000
 Wire Wire Line
@@ -304,7 +284,6 @@ Wire Wire Line
 Wire Wire Line
 	8350 2750 9150 2750
 Connection ~ 8350 2750
-Connection ~ 9000 1400
 Wire Wire Line
 	9300 2000 9300 1600
 Wire Wire Line
@@ -314,7 +293,6 @@ Wire Wire Line
 Connection ~ 10450 1700
 Wire Wire Line
 	10450 1700 10700 1700
-Connection ~ 9000 2550
 Wire Wire Line
 	7400 750  7400 850 
 $Comp
@@ -487,10 +465,6 @@ F 3 "" H 9150 3300 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	2000 5900 1400 5900
-Wire Wire Line
-	2000 6100 1400 6100
-Wire Wire Line
 	2000 6300 1400 6300
 Wire Wire Line
 	2000 5500 1400 5500
@@ -517,7 +491,7 @@ SD0
 Text Label 10850 1400 0    50   ~ 0
 ED0
 $Comp
-L MCU_Microchip_ATmega:ATmega8L-8PU U1
+L rpi_dbt03-rescue:ATmega8L-8PU-MCU_Microchip_ATmega U1
 U 1 1 5E3A2415
 P 2950 2500
 F 0 "U1" H 2950 4078 50  0000 C CNN
@@ -528,11 +502,7 @@ F 3 "http://ww1.microchip.com/downloads/en/DeviceDoc/atmel-2486-8-bit-avr-microc
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	9000 1400 10200 1400
-Wire Wire Line
 	9300 1600 10200 1600
-Wire Wire Line
-	9000 2550 11000 2550
 $Comp
 L Device:Crystal_Small Y1
 U 1 1 5E3B0514
@@ -620,8 +590,6 @@ Wire Wire Line
 	2950 1100 2950 850 
 Wire Wire Line
 	2950 750  3000 750 
-Wire Wire Line
-	3050 750  3050 850 
 $Comp
 L power:+3.3V #PWR0110
 U 1 1 5E3D52EF
@@ -661,17 +629,6 @@ MOSI
 Text Label 4950 4900 0    50   ~ 0
 SCK
 $Comp
-L Device:CP1_Small C6
-U 1 1 5E3E601C
-P 3300 850
-F 0 "C6" V 3528 850 50  0000 C CNN
-F 1 "TANTAL 2,2/16" V 3437 850 50  0000 C CNN
-F 2 "Capacitors_ThroughHole:CP_Radial_Tantal_D4.5mm_P2.50mm" H 3300 850 50  0001 C CNN
-F 3 "~" H 3300 850 50  0001 C CNN
-	1    3300 850 
-	0    -1   -1   0   
-$EndComp
-$Comp
 L Device:CP1_Small C5
 U 1 1 5E3E6195
 P 2700 850
@@ -688,22 +645,6 @@ Connection ~ 2950 850
 Wire Wire Line
 	2950 850  2950 750 
 Wire Wire Line
-	3050 850  3200 850 
-Connection ~ 3050 850 
-Wire Wire Line
-	3050 850  3050 1100
-$Comp
-L Device:CP1_Small C4
-U 1 1 5E3EED0B
-P 2150 2100
-F 0 "C4" H 2241 2146 50  0000 L CNN
-F 1 "TANTAL 2,2/16" H 2241 2055 50  0000 L CNN
-F 2 "Capacitors_ThroughHole:CP_Radial_Tantal_D4.5mm_P2.50mm" H 2150 2100 50  0001 C CNN
-F 3 "~" H 2150 2100 50  0001 C CNN
-	1    2150 2100
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
 	2350 2000 2150 2000
 $Comp
 L power:GND #PWR0112
@@ -714,17 +655,6 @@ F 1 "GND" H 2505 727 50  0000 C CNN
 F 2 "" H 2500 900 50  0001 C CNN
 F 3 "" H 2500 900 50  0001 C CNN
 	1    2500 900 
-	1    0    0    -1  
-$EndComp
-$Comp
-L power:GND #PWR0113
-U 1 1 5E3F38C3
-P 3500 900
-F 0 "#PWR0113" H 3500 650 50  0001 C CNN
-F 1 "GND" H 3505 727 50  0000 C CNN
-F 2 "" H 3500 900 50  0001 C CNN
-F 3 "" H 3500 900 50  0001 C CNN
-	1    3500 900 
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -743,17 +673,11 @@ Wire Wire Line
 Wire Wire Line
 	2500 850  2500 900 
 Wire Wire Line
-	3400 850  3500 850 
-Wire Wire Line
-	3500 850  3500 900 
-Wire Wire Line
 	2150 2200 2150 2300
 Wire Wire Line
 	3550 2600 4000 2600
 Wire Wire Line
 	3550 2500 4000 2500
-Wire Wire Line
-	3550 2400 4000 2400
 Wire Wire Line
 	2000 5100 1400 5100
 Text Label 1450 5100 0    50   ~ 0
@@ -768,8 +692,6 @@ Text Label 3650 2600 0    50   ~ 0
 GPIO2
 Text Label 3650 2500 0    50   ~ 0
 GPIO3
-Text Label 3650 2400 0    50   ~ 0
-GPIO4
 $Comp
 L Device:R R9
 U 1 1 5E44D470
@@ -788,7 +710,7 @@ L Device:R R10
 U 1 1 5E453CED
 P 4050 3300
 F 0 "R10" V 3843 3300 50  0000 C CNN
-F 1 "470" V 3934 3300 50  0000 C CNN
+F 1 "2k2" V 3934 3300 50  0000 C CNN
 F 2 "Resistors_ThroughHole:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" V 3980 3300 50  0001 C CNN
 F 3 "~" H 4050 3300 50  0001 C CNN
 	1    4050 3300
@@ -799,7 +721,7 @@ L Device:R R11
 U 1 1 5E46043A
 P 4350 3400
 F 0 "R11" V 4143 3400 50  0000 C CNN
-F 1 "470" V 4234 3400 50  0000 C CNN
+F 1 "2k2" V 4234 3400 50  0000 C CNN
 F 2 "Resistors_ThroughHole:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" V 4280 3400 50  0001 C CNN
 F 3 "~" H 4350 3400 50  0001 C CNN
 	1    4350 3400
@@ -810,7 +732,7 @@ L Device:R R12
 U 1 1 5E466607
 P 4650 3500
 F 0 "R12" V 4443 3500 50  0000 C CNN
-F 1 "470" V 4534 3500 50  0000 C CNN
+F 1 "2k2" V 4534 3500 50  0000 C CNN
 F 2 "Resistors_ThroughHole:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal" V 4580 3500 50  0001 C CNN
 F 3 "~" H 4650 3500 50  0001 C CNN
 	1    4650 3500
@@ -976,8 +898,6 @@ Wire Wire Line
 	6950 3300 6450 3300
 Text Notes 7400 7500 0    50   ~ 0
 RPI to DBT-03
-Text Notes 4900 4200 0    50   ~ 0
-R10-R14 ggf größer machen
 Wire Wire Line
 	3550 1600 3950 1600
 Text Label 3650 1600 0    50   ~ 0
@@ -994,4 +914,180 @@ Text Label 3700 2800 0    50   ~ 0
 _S0
 Text Label 3700 2900 0    50   ~ 0
 _SD0
+$Comp
+L Switch:SW_Push SW1
+U 1 1 5EE936A4
+P 10000 4200
+F 0 "SW1" H 10000 4485 50  0000 C CNN
+F 1 "SW_Push" H 10000 4394 50  0000 C CNN
+F 2 "Buttons_Switches_ThroughHole:SW_PUSH_6mm" H 10000 4400 50  0001 C CNN
+F 3 "~" H 10000 4400 50  0001 C CNN
+	1    10000 4200
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR0120
+U 1 1 5EE95F9E
+P 10350 5500
+F 0 "#PWR0120" H 10350 5250 50  0001 C CNN
+F 1 "GND" H 10355 5327 50  0000 C CNN
+F 2 "" H 10350 5500 50  0001 C CNN
+F 3 "" H 10350 5500 50  0001 C CNN
+	1    10350 5500
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	10200 4200 10350 4200
+Wire Wire Line
+	9800 4200 9100 4200
+Text Label 9150 4200 0    50   ~ 0
+GPIO3
+Wire Wire Line
+	8850 1400 10200 1400
+Wire Wire Line
+	8250 2550 11000 2550
+Text Label 1450 5600 0    50   ~ 0
+GPIO14
+Text Label 1450 5800 0    50   ~ 0
+GPIO15
+Text Label 1450 5900 0    50   ~ 0
+GPIO17
+Wire Wire Line
+	2000 6000 1400 6000
+$Comp
+L Connector_Generic:Conn_02x02_Counter_Clockwise J1
+U 1 1 5EEFCF81
+P 1000 5900
+F 0 "J1" H 1050 5575 50  0000 C CNN
+F 1 "Conn_02x02_Counter_Clockwise" H 1050 5666 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_2x02_Pitch2.54mm" H 1000 5900 50  0001 C CNN
+F 3 "~" H 1000 5900 50  0001 C CNN
+	1    1000 5900
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	1200 5900 2000 5900
+Wire Wire Line
+	1300 6100 1300 5800
+Wire Wire Line
+	1300 5800 1200 5800
+Wire Wire Line
+	1300 6100 2000 6100
+Wire Wire Line
+	1400 5800 1400 5700
+Wire Wire Line
+	1400 5700 700  5700
+Wire Wire Line
+	700  5700 700  5800
+$Comp
+L power:GND #PWR0122
+U 1 1 5EF35B76
+P 650 6000
+F 0 "#PWR0122" H 650 5750 50  0001 C CNN
+F 1 "GND" H 655 5827 50  0000 C CNN
+F 2 "" H 650 6000 50  0001 C CNN
+F 3 "" H 650 6000 50  0001 C CNN
+	1    650  6000
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	700  5900 650  5900
+Wire Wire Line
+	650  5900 650  6000
+Wire Wire Line
+	3050 750  3050 850 
+$Comp
+L Device:CP1_Small C4
+U 1 1 5EF5520E
+P 3400 850
+F 0 "C4" V 3172 850 50  0000 C CNN
+F 1 "TANTAL 2,2/16" V 3263 850 50  0000 C CNN
+F 2 "Capacitors_ThroughHole:CP_Radial_Tantal_D4.5mm_P2.50mm" H 3400 850 50  0001 C CNN
+F 3 "~" H 3400 850 50  0001 C CNN
+	1    3400 850 
+	0    -1   -1   0   
+$EndComp
+$Comp
+L power:GND #PWR0113
+U 1 1 5EF5577C
+P 3750 950
+F 0 "#PWR0113" H 3750 700 50  0001 C CNN
+F 1 "GND" H 3755 777 50  0000 C CNN
+F 2 "" H 3750 950 50  0001 C CNN
+F 3 "" H 3750 950 50  0001 C CNN
+	1    3750 950 
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3300 850  3050 850 
+Connection ~ 3050 850 
+Wire Wire Line
+	3050 850  3050 1100
+Wire Wire Line
+	3500 850  3750 850 
+Wire Wire Line
+	3750 850  3750 950 
+$Comp
+L Device:CP1_Small C6
+U 1 1 5EF76464
+P 2150 2100
+F 0 "C6" V 1922 2100 50  0000 C CNN
+F 1 "TANTAL 2,2/16" V 2013 2100 50  0000 C CNN
+F 2 "Capacitors_ThroughHole:C_Disc_D3.0mm_W2.0mm_P2.50mm" H 2150 2100 50  0001 C CNN
+F 3 "~" H 2150 2100 50  0001 C CNN
+	1    2150 2100
+	1    0    0    -1  
+$EndComp
+$Comp
+L Switch:SW_Push SW2
+U 1 1 5EF814AB
+P 10000 4800
+F 0 "SW2" H 10000 5085 50  0000 C CNN
+F 1 "SW_Push" H 10000 4994 50  0000 C CNN
+F 2 "Buttons_Switches_ThroughHole:SW_PUSH_6mm" H 10000 5000 50  0001 C CNN
+F 3 "~" H 10000 5000 50  0001 C CNN
+	1    10000 4800
+	1    0    0    -1  
+$EndComp
+$Comp
+L Switch:SW_Push SW3
+U 1 1 5EF81E52
+P 10000 5350
+F 0 "SW3" H 10000 5635 50  0000 C CNN
+F 1 "SW_Push" H 10000 5544 50  0000 C CNN
+F 2 "Buttons_Switches_ThroughHole:SW_PUSH_6mm" H 10000 5550 50  0001 C CNN
+F 3 "~" H 10000 5550 50  0001 C CNN
+	1    10000 5350
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	10350 4200 10350 4800
+Wire Wire Line
+	10200 4800 10350 4800
+Connection ~ 10350 4800
+Wire Wire Line
+	10350 4800 10350 5350
+Wire Wire Line
+	10200 5350 10350 5350
+Connection ~ 10350 5350
+Wire Wire Line
+	10350 5350 10350 5500
+Wire Wire Line
+	9800 4800 9100 4800
+Wire Wire Line
+	9800 5350 9100 5350
+Text Label 9200 4800 0    50   ~ 0
+GPIO4
+Text Label 9200 5350 0    50   ~ 0
+GPIO14
+Wire Wire Line
+	3550 2100 3950 2100
+Wire Wire Line
+	3550 2200 4000 2200
+Text Label 3650 2100 0    50   ~ 0
+GPIO15
+Text Label 3650 2200 0    50   ~ 0
+GPIO17
+Text Notes 10600 7650 0    50   ~ 0
+3
 $EndSCHEMATC

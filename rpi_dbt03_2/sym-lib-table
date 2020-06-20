@@ -1,3 +1,4 @@
 (sym_lib_table
   (lib (name Raspberry_Pi_2_or_3)(type Legacy)(uri ${KIPRJMOD}/lib/Raspberry-Pi-3-library-for-kicad/Raspberry_Pi_2_or_3.lib)(options "")(descr ""))
+  (lib (name rpi_dbt03-rescue)(type Legacy)(uri ${KIPRJMOD}/rpi_dbt03-rescue.lib)(options "")(descr ""))
 )
