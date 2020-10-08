@@ -23,12 +23,8 @@
 #include <arpa/inet.h> 
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-
-static void pabort(const char *s)
-{
-	perror(s);
-	abort();
-}
+int open_spi();
+void close_spi(int);
 
 static const char *device = "/dev/spidev0.0";
 
@@ -130,6 +126,11 @@ int open_spi()
 	return fd;
 }
 
+void close_spi(int fd)
+{
+	close(fd);
+}
+
 void set_leds(int led)
 {
 	digitalWrite(22, (led>>0)&0x01);
@@ -171,23 +172,23 @@ int term_start(int fd)
 int term_constart(int fd)
 {
 	int status=set_mcu_led(fd, 0, 0x15);
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	status=set_tone(fd, 2); //440 Hz
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	usleep(1000000);
 	status=set_tone(fd, 1);
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	usleep(2000000);
 	status=set_tone(fd, 2);
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	usleep( 500000);
 	status=set_tone(fd, 3);
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	usleep(1000000);
 	status=set_tone(fd, 4);
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	status=set_mcu_led(fd, 0, 0);
-	if ((status>>4)&0x01==0) return -1;
+	if (((status>>4)&0x01)==0) return -1;
 	usleep(1000000);
 	return 0;
 }
@@ -214,7 +215,7 @@ int do_connect(const char *target)
 	int port=atoi(colon+1);
 	printf("Addr: %s Port: %d\n", addr, port);
 
-	int sockfd = 0, n = 0;
+	int sockfd = 0;
 	struct sockaddr_in serv_addr; 
 
 	if((sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0)
@@ -270,7 +271,7 @@ int handle_socket_to_term(int fd, int sock_fd)
 		int n;
 		for (n=0; n<l; n++) {
 			status=send_octet(fd, buf[n], &res);
-			if ( (status>>4)&0x01==0) {
+			if ( ((status>>4)&0x01)==0) {
 				return -1;
 			}
 		}
@@ -283,7 +284,7 @@ int handle_term_to_socket(int fd, int sock_fd)
 {
 	uint8_t oct=0;
 	int status=read_octet(fd, &oct);
-	if ( (status>>4)&0x01==0) {
+	if ( ((status>>4)&0x01)==0) {
 		return -1;
 	}
 	if (oct!=0xff) {
@@ -319,14 +320,13 @@ int socket_term_loop(int fd, int sock_fd)
 
 int main(int argc, char *argv[])
 {
-	int ret = 0;
 	int fd=open_spi();
 	if (fd<0) {
 		printf("couldn't open device\n");
 		return 1;
 	}
 	if (wiringPiSetup()==-1) {
-		printf("Coulsn't open WiringPi\n");
+		printf("Couldn't open WiringPi\n");
 		return 1;
 	}
 	if (argc!=2) {
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
 	term_constart(fd);
 
 	
-	int status=socket_term_loop(fd, sock_fd);
+	socket_term_loop(fd, sock_fd);
 	reset_mcu();
 
 	close(fd);
