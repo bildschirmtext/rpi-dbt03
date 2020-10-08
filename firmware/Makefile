@@ -34,7 +34,7 @@ size:
 	avr-size --mcu=$(MCU) -C $(TARGET).elf
 
 program:
-	avrdude -p$(MCU) $(PORT) $(BAUD) -c$(PROGRAMMER) -Uflash:w:$(TARGET).hex:a -U lfuse:w:0xee:m -U hfuse:w:0xd1:m 
+	avrdude -p$(MCU) $(PORT) $(BAUD) -C avrdude.conf -c$(PROGRAMMER) -Uflash:w:$(TARGET).hex:a -U lfuse:w:0xee:m -U hfuse:w:0xd1:m 
 
 clean_tmp:
 	rm -rf *.o
