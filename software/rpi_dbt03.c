@@ -8,7 +8,7 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
-#include <wiringPi.h>
+#include <bcm2835.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
@@ -21,6 +21,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h> 
+
+#define PIN_LED_BLUE 6 
+#define PIN_LED_GREEN 13
+#define PIN_RESET 25
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 int open_spi();
@@ -133,8 +137,14 @@ void close_spi(int fd)
 
 void set_leds(int led)
 {
-	digitalWrite(22, (led>>0)&0x01);
-	digitalWrite(23, (led>>1)&0x01);
+	if ( (led>>0)!=0) 
+		bcm2835_gpio_write(PIN_LED_BLUE, HIGH);
+		else
+		bcm2835_gpio_write(PIN_LED_BLUE, LOW);
+	if ( (led>>1)!=0) 
+		bcm2835_gpio_write(PIN_LED_GREEN, HIGH);
+		else
+		bcm2835_gpio_write(PIN_LED_GREEN, LOW);
 }
 
 
@@ -247,11 +257,11 @@ int do_connect(const char *target)
 
 void reset_mcu()
 {
-	pinMode(6, OUTPUT);
+	bcm2835_gpio_fsel(PIN_RESET, BCM2835_GPIO_FSEL_OUTP);
 	printf("Reset MCU...");
-	digitalWrite(6, 0);
+	bcm2835_gpio_write(PIN_RESET, LOW);
 	usleep(200000);
-	digitalWrite(6, 1);
+	bcm2835_gpio_write(PIN_RESET, HIGH);
 	usleep(500000);
 	printf("done\n");
 }
@@ -325,8 +335,8 @@ int main(int argc, char *argv[])
 		printf("couldn't open device\n");
 		return 1;
 	}
-	if (wiringPiSetup()==-1) {
-		printf("Couldn't open WiringPi\n");
+	if (!bcm2835_init()) {
+		printf("Couldn't open BCM2835\n");
 		return 1;
 	}
 	if (argc!=2) {
@@ -334,8 +344,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	pinMode(22, OUTPUT);
-	pinMode(23, OUTPUT);
+	bcm2835_gpio_fsel(PIN_LED_BLUE, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_fsel(PIN_LED_GREEN, BCM2835_GPIO_FSEL_OUTP);
 
 
 	term_start(fd);
@@ -353,6 +363,6 @@ int main(int argc, char *argv[])
 	reset_mcu();
 
 	close(fd);
-
+	bcm2835_close();
 	return 0;
 }
