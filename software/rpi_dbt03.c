@@ -339,9 +339,22 @@ int main(int argc, char *argv[])
 		printf("Couldn't open BCM2835\n");
 		return 1;
 	}
-	if (argc!=2) {
-		printf("Usage: %s <ip>:<port>\n", argv[0]);
-		return 1;
+
+	char c_string[128];
+	char *connection=NULL;
+	
+	FILE *cf=fopen("/boot/btx_ip.txt","r");
+	if (cf==NULL) {
+		if (argc!=2) {
+			printf("Usage: %s <ip>:<port>\n", argv[0]);
+			return 1;
+		}
+		connection=argv[1];
+	} else {
+		memset(c_string, 0, sizeof(c_string));
+		fread(c_string, sizeof(c_string)-1, 1, cf);
+		connection=c_string;
+		fclose(cf);
 	}
 
 	bcm2835_gpio_fsel(PIN_LED_BLUE, BCM2835_GPIO_FSEL_OUTP);
@@ -350,7 +363,7 @@ int main(int argc, char *argv[])
 
 	term_start(fd);
 
-	int sock_fd=do_connect(argv[1]);
+	int sock_fd=do_connect(connection);
 	if (fd<0) {
 		reset_mcu();
 		return 1;
