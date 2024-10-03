@@ -1,6 +1,15 @@
 # rpi-dbt03
 Hardware, Software and Firmware for a Raspberry Pi to DBT-03 adapter
 
+
+There is now a possibility to directly patch a Bookworm Raspbian image.
+
+Run `./patch_image.sh <imagename>` as root. It only works on uncompressed images. You can then `dd` that image onto your SD-card or use the Raspberry Pi Imager. The later also allows you to set settings.
+The image will reboot multiple times.
+
+
+## Old way of installing it
+
 On the Raspberry PI check out this repository. 
 
 Install the packages in install-packages.sh (run it as root). 
