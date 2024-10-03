@@ -8,7 +8,6 @@
 #include <sys/ioctl.h>
 #include <linux/types.h>
 #include <linux/spi/spidev.h>
-#include <bcm2835.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
@@ -22,6 +21,7 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 
+
 #define PIN_LED_BLUE 6 
 #define PIN_LED_GREEN 13
 #define PIN_RESET 25
@@ -29,6 +29,10 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 int open_spi();
 void close_spi(int);
+
+
+#define SA struct sockaddr
+
 
 static const char *device = "/dev/spidev0.0";
 
@@ -135,16 +139,18 @@ void close_spi(int fd)
 	close(fd);
 }
 
+void set_gpio(const int no, const int value)
+{
+	char cmd[128];
+	memset(cmd, 0, sizeof(cmd));
+	snprintf(cmd, sizeof(cmd)-1, "/usr/bin/gpioset 0 %d=%d", no, value%2);
+	system(cmd);
+}
+
 void set_leds(int led)
 {
-	if ( (led>>0)!=0) 
-		bcm2835_gpio_write(PIN_LED_BLUE, HIGH);
-		else
-		bcm2835_gpio_write(PIN_LED_BLUE, LOW);
-	if ( (led>>1)!=0) 
-		bcm2835_gpio_write(PIN_LED_GREEN, HIGH);
-		else
-		bcm2835_gpio_write(PIN_LED_GREEN, LOW);
+	set_gpio(PIN_LED_BLUE, (led>>0)%2);
+	set_gpio(PIN_LED_GREEN, (led>>1)%2);
 }
 
 
@@ -203,65 +209,42 @@ int term_constart(int fd)
 	return 0;
 }
 
-int do_connect(const char *target)
+int do_connect(const char *hostname, const int port)
 {
-	char addr[256];
-	memset(addr, 0, sizeof(addr));
-	char *colon=strchr(target, ':');
-	if (colon==NULL) {
-		printf("Error invalid address/port\n");
-		return -1;
-	}
-	int alen=colon-target;
-	if (alen<=0) {
-		printf("Error address to short\n");
-		return -1;
-	}
-	if (alen>=255) {
-		printf("Error address to long\n");
-		return -1;
-	}
-	strncpy(addr, target, alen);
-	int port=atoi(colon+1);
-	printf("Addr: %s Port: %d\n", addr, port);
-
-	int sockfd = 0;
-	struct sockaddr_in serv_addr; 
-
-	if((sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) < 0)
-	{
-		printf("\n Error : Could not create socket \n");
-		return -1;
-	} 
-
-	memset(&serv_addr, 0, sizeof(serv_addr)); 
-
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(port); 
-
-	if(inet_pton(AF_INET, addr, &serv_addr.sin_addr)<=0)
-	{
-		printf("inet_pton error occured\n");
-		return -1;
-	} 
-
-	if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-	{
-		if (errno==EINPROGRESS) return sockfd;
-		printf("Error : Connect Failed  %d (%s)\n", errno, strerror(errno));
-		return -1;
-	} 
-	return sockfd;
+        struct hostent *h=gethostbyname(hostname);
+        if (h==NULL) {
+                fprintf(stderr, "Couldn't resolve hostname %s\n", hostname);
+                return -1;
+        }
+        int sockfd=socket(h->h_addrtype, SOCK_STREAM, 0);
+        if (sockfd==-1) return sockfd;
+        fprintf(stderr, "do_connect %s %d\n", hostname, port);
+        if (h->h_addrtype==AF_INET) {
+                struct sockaddr_in servaddr;
+                memset(&servaddr, 0, sizeof(servaddr));
+                servaddr.sin_family=AF_INET;
+                memcpy(&(servaddr.sin_addr.s_addr), h->h_addr, 4);
+                servaddr.sin_port=htons(port);
+                if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr))!=0) {
+                        fprintf(stderr, "Couldn't connect to %s:%d\n", hostname, port);
+                        return -1;
+                }
+        }
+        struct timeval tv;
+        tv.tv_sec=0;
+        tv.tv_usec=40*1000;
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+        return sockfd;
 }
+
 
 
 void reset_mcu()
 {
-	bcm2835_gpio_fsel(PIN_RESET, BCM2835_GPIO_FSEL_OUTP);
 	printf("Reset MCU...");
-	bcm2835_gpio_write(PIN_RESET, LOW);
+	set_gpio(PIN_RESET, 0);
 	usleep(200000);
-	bcm2835_gpio_write(PIN_RESET, HIGH);
+	set_gpio(PIN_RESET, 1);
 	usleep(500000);
 	printf("done\n");
 }
@@ -335,18 +318,14 @@ int main(int argc, char *argv[])
 		printf("couldn't open device\n");
 		return 1;
 	}
-	if (!bcm2835_init()) {
-		printf("Couldn't open BCM2835\n");
-		return 1;
-	}
 
 	char c_string[128];
 	char *connection=NULL;
 	
 	FILE *cf=fopen("/boot/btx_ip.txt","r");
 	if (cf==NULL) {
-		if (argc!=2) {
-			printf("Usage: %s <ip>:<port>\n", argv[0]);
+		if (argc!=3) {
+			printf("Usage: %s <ip> <port>\n", argv[0]);
 			return 1;
 		}
 		connection=argv[1];
@@ -357,13 +336,9 @@ int main(int argc, char *argv[])
 		fclose(cf);
 	}
 
-	bcm2835_gpio_fsel(PIN_LED_BLUE, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_fsel(PIN_LED_GREEN, BCM2835_GPIO_FSEL_OUTP);
-
-
 	term_start(fd);
 
-	int sock_fd=do_connect(connection);
+	int sock_fd=do_connect(connection, atoi(argv[2]));
 	if (fd<0) {
 		reset_mcu();
 		return 1;
@@ -376,6 +351,5 @@ int main(int argc, char *argv[])
 	reset_mcu();
 
 	close(fd);
-	bcm2835_close();
 	return 0;
 }
