@@ -19,7 +19,7 @@ mkdir -p $TMPDIR/root
 mount "$loopback"p1 $TMPDIR/boot
 mount "$loopback"p2 $TMPDIR/root
 
-cp software/rpi_dbt03 $TMPDIR/root/usr/local/sbin/
+cp software/rpi_dbt03.c software/rpi_dbt03_service.sh $TMPDIR/root/usr/local/sbin/
 cp software/rpi_dbt03.service $TMPDIR/root/etc/systemd/system/
 ln -s $TMPDIR/root/etc/systemd/system/rpi_dbt03.service $TMPDIR/root/etc/systemd/system/multi-user.target.wants/rpi_dbt03.service
 cat software/boot/config_clean.txt >> $TMPDIR/boot/config.txt
