@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 Restart=always
-ExecStart=/usr/local/sbin/rpi_dbt03 195.201.94.166:20000 
+ExecStart=/usr/local/sbin/rpi_dbt03_service.sh
 User=root
 Group=root
 
